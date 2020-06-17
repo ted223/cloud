@@ -127,40 +127,6 @@ resource "aws_s3_bucket" "hardiktaskbucket" {
   }
 }
 
-locals {
-  s3_origin_id = "hardik_s3_origin"
-}
-
-data "aws_iam_policy_document" "s3_bucket_policy" {
-      statement {
-          actions   = ["s3:GetObject"]
-          resources = ["${aws_s3_bucket.hardiktaskbucket.arn}/*"]
-
-          principals {
-              type        = "AWS"
-              identifiers = ["${aws_cloudfront_origin_access_identity.OAI.iam_arn}"]
-          }
-      }
-
-      statement {
-          actions   = ["s3:ListBucket"]
-          resources = ["${aws_s3_bucket.hardiktaskbucket.arn}"]
-
-          principals {
-              type        = "AWS"
-              identifiers = ["${aws_cloudfront_origin_access_identity.OAI.iam_arn}"]
-          }
-      }
-}
-
-
-resource "aws_s3_bucket_policy" "bucket_policy" {
-  depends_on = [
-        aws_s3_bucket.hardiktaskbucket
-  ]
-  bucket = "${aws_s3_bucket.hardiktaskbucket.id}"
-  policy = data.aws_iam_policy_document.s3_bucket_policy.json
-}
 
 
 resource "aws_s3_bucket_object" "object" {
@@ -173,28 +139,28 @@ resource "aws_s3_bucket_object" "object" {
   acl    = "public-read"
 }
 
-resource "aws_cloudfront_origin_access_identity" "OAI" {
-      comment = "access-identity-hb"
+locals {
+  s3_origin_id = "S3-hardiktaskbucket"
 }
-
 
 resource "aws_cloudfront_distribution" "s3_distribution" {
    depends_on = [
-          aws_s3_bucket.hardiktaskbucket,
-          aws_cloudfront_origin_access_identity.OAI
+          aws_s3_bucket_object.object
    ]
       
    origin {
-    domain_name = "${aws_s3_bucket.hardiktaskbucket.bucket_regional_domain_name}"
-    origin_id   = "${local.s3_origin_id}"
+    domain_name = "hardiktaskbucket.s3.amazonaws.com"
+    origin_id   = local.s3_origin_id
     
-    s3_origin_config {
-              origin_access_identity = "origin-access-identity/cloudfront/${aws_cloudfront_origin_access_identity.OAI.id}"
-          }
+    custom_origin_config {
+            http_port = 80
+            https_port = 80
+            origin_protocol_policy = "match-viewer"
+            origin_ssl_protocols = ["TLSv1", "TLSv1.1", "TLSv1.2"]
+        }
    }
 
-     enabled = true
-     is_ipv6_enabled = true
+   enabled = true
 
    restrictions {
     geo_restriction {
@@ -204,7 +170,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "${aws_s3_bucket.hardiktaskbucket.id}"
+    target_origin_id = local.s3_origin_id
    
     forwarded_values {
       query_string = false
@@ -213,45 +179,16 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
       }
     }
 
- viewer_protocol_policy = "allow-all"
+  viewer_protocol_policy = "allow-all"
     min_ttl                = 0
     default_ttl            = 3600
     max_ttl                = 86400
   }
 
 
-viewer_certificate {
+  viewer_certificate {
     cloudfront_default_certificate = true
   }
 }
 
-resource "null_resource" "update_URL" {
-      depends_on = [
-          aws_cloudfront_distribution.s3_distribution
-      ]
 
-      connection {
-          type     = "ssh"
-          user     = "ec2-user"
-          private_key = tls_private_key.keypair1.private_key_pem
-          host     = aws_instance.os1.public_ip
-      }
-
-      provisioner "remote-exec" {
-          inline = [
-              "sudo sed 's/john.jpg/${aws_cloudfront_distribution.s3_distribution.domain_name}|g' /var/www/html/task1.html"
-          ]
-      }
-}
-
-resource "null_resource" "open_webpage" {
-      depends_on = [
-          aws_cloudfront_distribution.s3_distribution,
-          null_resource.update_URL
-      ]
-
-      provisioner "local-exec" {
-          command = "chrome http://${aws_instance.os1.public_ip}/task1.html &"
-      }
-
-}
