@@ -6,7 +6,7 @@ provider "aws" {
 resource "aws_security_group" "sg1" {
   name        = "sg1"
   description = "Allows port 80 and 22"
-  
+
 
   ingress {
     description = "port 80 for http protocol"
@@ -37,7 +37,7 @@ resource "aws_security_group" "sg1" {
 
 resource "tls_private_key" "keypair1" {
   algorithm   = "RSA"
-  
+
 }
 
 resource "local_file" "key_local" {
@@ -71,10 +71,10 @@ resource "aws_instance" "os1" {
       "sudo systemctl enable httpd",
     ]
   }
-     
- 
+
+
      tags = {
-              Name= "os1" 
+              Name= "os1"
             }
 }
 
@@ -117,7 +117,7 @@ depends_on = [
     ]
   }
 }
-resource "aws_s3_bucket" "hardiktaskbucket" {
+resource "aws_s3_bucket" "bucket" {
   bucket = "hardiktaskbucket"
   acl    = "public-read"
 
@@ -147,11 +147,11 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
    depends_on = [
           aws_s3_bucket_object.object
    ]
-      
+
    origin {
     domain_name = "hardiktaskbucket.s3.amazonaws.com"
     origin_id   = local.s3_origin_id
-    
+
     custom_origin_config {
             http_port = 80
             https_port = 80
@@ -171,7 +171,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = local.s3_origin_id
-   
+
     forwarded_values {
       query_string = false
       cookies {
@@ -191,4 +191,8 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   }
 }
 
-
+resource "null_resource" "execute" {
+  provisioner "local-exec" {
+    command = "firefox &{aws_instance.os1.public_ip}/task1.html"
+  }
+}
