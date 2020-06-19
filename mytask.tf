@@ -94,10 +94,12 @@ resource "aws_volume_attachment" "volume_attach" {
   force_detach = true
 }
 
+
+
 resource "null_resource" "partition"  {
 
 depends_on = [
-    aws_volume_attachment.volume_attach
+    aws_volume_attachment.volume_attach,
   ]
 
 
@@ -117,7 +119,7 @@ depends_on = [
     ]
   }
 }
-resource "aws_s3_bucket" "bucket" {
+resource "aws_s3_bucket" "hardiktaskbucket" {
   bucket = "hardiktaskbucket"
   acl    = "public-read"
 
@@ -135,7 +137,7 @@ resource "aws_s3_bucket_object" "object" {
   ]
   bucket = "hardiktaskbucket"
   key    = "john.jpg"
-  source = "C:/Users/dell/Downloads/john.jpg"
+  source = "/root/john.jpg"
   acl    = "public-read"
 }
 
@@ -160,7 +162,8 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
         }
    }
 
-   enabled = true
+   enabled             = true
+   is_ipv6_enabled     = true
 
    restrictions {
     geo_restriction {
@@ -191,8 +194,6 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   }
 }
 
-resource "null_resource" "execute" {
-  provisioner "local-exec" {
-    command = "firefox &{aws_instance.os1.public_ip}/task1.html"
-  }
+output "cloudfront_domain" {
+  value = "https://${aws_cloudfront_distribution.s3_distribution.domain_name}/john.jpg"
 }
